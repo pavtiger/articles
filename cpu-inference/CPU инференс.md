@@ -1,6 +1,11 @@
 В этом файле собраны все команды из видео по инференсу LLM моделей на CPU.
 
 # Скачивание весов и подготовка моделей
+С ollama.com
+```shell
+ollama run qwen3-coder:30b-a3b-fp16
+```
+
 Способ через `wget` для скачивания весов от unsloth на huggung face
 
 `download.sh`
@@ -60,6 +65,15 @@ echo "All downloads completed."
 ./bin/llama-gguf-split --merge \
   /path/to/Qwen3-Coder-480B-A35B-Instruct-Q6_K-00001-of-00009.gguf \
   /path/to/Qwen3-Coder-Q6_K.gguf
+```
+
+Modelfile
+```
+FROM Qwen3-Coder-480B-Q4_0.gguf
+```
+И дальше
+```
+ollama create Q4_0 -f /mnt/archive/qwen-coder/Q4_0/Modelfile
 ```
 
 # Запуск ollama
@@ -204,7 +218,20 @@ cmake -B build -S . \
 
 # compile
 cmake --build build -j"$(nproc)"
+```
 
+Flash attention
+```shell
+cmake -B build -S . \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DGGML_CUDA=ON \
+  -DLLAMA_BUILD_SERVER=ON \
+  -DGGML_CUDA_FA=ON \
+  -DGGML_CUDA_F16=ON \
+  -DGGML_NATIVE=ON
+
+# compile
+cmake --build build -j"$(nproc)"
 ```
 
 Тестовый запрос в llama.cpp
@@ -328,4 +355,109 @@ server {
 Запуск open-webui
 ```shell
 docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main
+```
+
+# Бенчмарки
+Для проверки влияния квантизации на llama.cpp была взята модель Qwen3-Coder. Для каждой модели был запущен промпт “Write a merge sort algorithm” с температурой 0, контекстом 16384 и обрезан вывод в 300 токенов (иначе по ходу генерации нелинейно возрастает KV-cache и новые токены генерируются чуть дольше, что влияет на среднее время на токен). Эксперимент проводился 3 раза и учитывалось среднее.
+
+![[1_vs_2_cpu.png]]
+![[llamacpp_vs_ollama.png]]
+![[cpu_vs_cpu_and_gpu.png]]
+![[popular_models.png]]
+![[GPU.png]]
+
+
+Команда с нулевой температурой для `llama.cpp` с GPU ускорением
+```shell
+export OMP_NUM_THREADS=64
+export KMP_AFFINITY=granularity=fine,compact 
+export OMP_PLACES=threads
+export OMP_PROC_BIND=spread
+
+numactl --cpunodebind=0 --membind=0 ./build/bin/llama-server \
+  -m /home/serverflow/Q4_K_S/Qwen3-Coder-480B-A35B-Instruct-Q4_K_S-00001-of-00006.gguf \
+  --n-cpu-moe 999 \
+  --n-gpu-layers 999 \
+  --host 0.0.0.0 \
+  --port 11435 \
+  --no-mmap \
+  --threads 64 \
+  --ctx-size 16384 \
+  --temp 0.0 \
+  --n-predict 300 \
+  --min-p 0.0 \
+  --top-p 1 \
+  --top-k 0 \
+  --repeat-penalty 1.0
+```
+
+Команда с нулевой температурой для `llama.cpp` только на процессоре
+```shell
+export OMP_NUM_THREADS=64
+export KMP_AFFINITY=granularity=fine,compact 
+export OMP_PLACES=threads
+export OMP_PROC_BIND=spread
+
+./build/bin/llama-server \
+  --model /mnt/services/models/Qwen3-Coder-480B-A35B-Instruct-Q4_K_S-00001-of-00006.gguf \
+  --host 0.0.0.0 \
+  --port 11435 \
+  --threads 64 \
+  --ctx-size 16384 \
+  --n-gpu-layers 0 \
+  -ot ".ffn_.*_exps.[^0]=CPU" \
+  --mmapped \
+  --temp 0.0 \
+  --n-predict 300 \
+  --min-p 0.0 \
+  --top-p 1 \
+  --top-k 0 \
+  --repeat-penalty 1.0
+```
+
+Так, как в ollama нет встроенного счетчика токенов в секунду под запрос, для нее использовался такой скрипт, который тоже фиксирует нулевую температуру
+```shell
+#!/bin/bash
+PROMPT="Write a merge sort algorithm."
+MODEL=${1:-Q5_K_M:latest}
+MAX_TOKENS=300
+
+TOKEN_COUNT=0
+START=$(date +%s.%N)
+
+# Stream and count tokens
+curl -s -N -X POST http://localhost:11434/api/chat \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"model\": \"$MODEL\",
+    \"stream\": true,
+    \"messages\": [
+      {\"role\": \"user\", \"content\": \"$PROMPT\"}
+    ],
+    \"options\": {
+      \"temperature\": 0.0,
+      \"min_p\": 0.0,
+      \"top_p\": 1,
+      \"top_k\": 0,
+      \"repeat_penalty\": 1.0
+    }
+  }" | while read -r line; do
+    echo $line
+    echo $TOKEN_COUNT
+    content=$(echo "$line" | jq -r '.message.content // empty' 2>/dev/null)
+    if [[ -n "$content" ]]; then
+      ((TOKEN_COUNT++))
+    fi
+    [[ "$TOKEN_COUNT" -ge "$MAX_TOKENS" ]] && break
+  done
+
+END=$(date +%s.%N)
+ELAPSED=$(echo "$END - $START" | bc -l)
+TPS=$(echo "scale=2; $MAX_TOKENS / $ELAPSED" | bc -l)
+
+echo
+echo "-----------------------------------------"
+echo "Elapsed time: $ELAPSED seconds"
+echo "Estimated tokens: $MAX_TOKENS"
+echo "Average tokens/sec: $TPS"
 ```
