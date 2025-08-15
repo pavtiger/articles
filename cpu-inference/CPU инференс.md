@@ -220,20 +220,6 @@ cmake -B build -S . \
 cmake --build build -j"$(nproc)"
 ```
 
-Flash attention
-```shell
-cmake -B build -S . \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DGGML_CUDA=ON \
-  -DLLAMA_BUILD_SERVER=ON \
-  -DGGML_CUDA_FA=ON \
-  -DGGML_CUDA_F16=ON \
-  -DGGML_NATIVE=ON
-
-# compile
-cmake --build build -j"$(nproc)"
-```
-
 Тестовый запрос в llama.cpp
 ```shell
 curl -X POST http://192.168.88.74:11435/api/chat \
@@ -368,25 +354,26 @@ docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway -v open-
 
 ## Qwen3-Coder 480B
 
-| Model       | Quantization   | Full name                  | RAM requirements | VRAM requirements | 2 CPU llama.cpp | 1 CPU llama.cpp | 1 CPU Ollama | 1 CPU + GPU llama.cpp |
-| ----------- | -------------- | -------------------------- | ---------------- | ----------------- | --------------- | --------------- | ------------ | --------------------- |
-| Qwen3-Coder | Q2_K           | Qwen3-Coder Q2_K           | 162              | 12.9              | 4.53            | 7.23            | 4.03         | 8.59                  |
-| Qwen3-Coder | Q4_0           | Qwen3-Coder Q4_0           | 260              | 14                | 3.06            | 5.33            | 3.79         | 6.88                  |
-| Qwen3-Coder | Q6_K           | Qwen3-Coder Q6_K           | 370              | 18                | 2.68            | 3.88            | 2.55         | 5.08                  |
-| Qwen3-Coder | Q4_K_M, Q4_K_S | Qwen3-Coder Q4_K_M, Q4_K_S | 274              | 14.8              | 2.28            | 4.95            | 3.15         | 6.57                  |
-| Qwen3-Coder | Q4_K_M, Q4_K_S | Qwen3-Coder Q4_K_M, Q4_K_S | 260              | 14.8              | 2.54            | 5.11            | 4.06         | 6.82                  |
-| Qwen3-Coder | Q8_0           | Qwen3-Coder Q8_0           | 480              | 20                | 1.52            | 3.07            | 2.75         | 4.09                  |
-| Qwen3-Coder | Q5_K_M         | Qwen3-Coder Q5_K_M         | 320              | 16                | 1.86            | 4.23            | 2.5          | 5.76                  |
-| Qwen3-Coder | Q4_K_XL        | Qwen3-Coder Q4_K_XL        | 260              | 15                | 2.38            | 5.06            | 3.14         | 6.75                  |
-| Qwen3-Coder | BF_16          | Qwen3-Coder BF_16          | 874              | 33                | 1.01            | 1.72            | 1.26         | 0.67                  |
+| Model       | Quantization   | RAM requirements | VRAM requirements | 2 CPU llama.cpp | 1 CPU llama.cpp | 1 CPU Ollama | 1 CPU + GPU llama.cpp |
+| ----------- | -------------- | ---------------- | ----------------- | --------------- | --------------- | ------------ | --------------------- |
+| Qwen3-Coder | Q2_K           | 162              | 12.9              | 4.53            | 7.23            | 4.03         | 8.59                  |
+| Qwen3-Coder | Q4_0           | 260              | 14                | 3.06            | 5.33            | 3.79         | 6.88                  |
+| Qwen3-Coder | Q6_K           | 370              | 18                | 2.68            | 3.88            | 2.55         | 5.08                  |
+| Qwen3-Coder | Q4_K_M, Q4_K_S | 274              | 14.8              | 2.28            | 4.95            | 3.15         | 6.57                  |
+| Qwen3-Coder | Q4_K_M, Q4_K_S | 260              | 14.8              | 2.54            | 5.11            | 4.06         | 6.82                  |
+| Qwen3-Coder | Q8_0           | 480              | 20                | 1.52            | 3.07            | 2.75         | 4.09                  |
+| Qwen3-Coder | Q5_K_M         | 320              | 16                | 1.86            | 4.23            | 2.5          | 5.76                  |
+| Qwen3-Coder | Q4_K_XL        | 260              | 15                | 2.38            | 5.06            | 3.14         | 6.75                  |
+| Qwen3-Coder | BF_16          | 874              | 33                | 1.01            | 1.72            | 1.26         | 0.67                  |
 
 ## Другие модели
-| Model                         | Quantization | Full name                          | RAM requirements | VRAM requirements | 1 CPU llama.cpp | 1 CPU llama.cpp + GPU ускорением |
-| ----------------------------- | ------------ | ---------------------------------- | ---------------- | ----------------- | --------------- | -------------------------------- |
-| Qwen3-235B-A22B-Thinking-2507 | Q8_0         | Qwen3-235B-A22B-Thinking-2507 Q8_0 | 225              | 13.9              | 4.57            | 6.06                             |
-| DeepSeek-R1-0528 671B         | Q8_0         | DeepSeek-R1-0528 671B Q8_0         | 648              | 25                | 2.33            | 4.19                             |
-| Kimi-K2-1026B                 | Q4_K_M       | Kimi-K2-1026B Q4_K_M               | 571              | 15.4              | 4.63            | 6.46                             |
-| GPT OSS 120B                  | Q4_K_M       | GPT OSS 120B                       | 59               | 5                 | 21.99           | 25.8                             |
+| Model                         | Quantization | RAM requirements | VRAM requirements | 1 CPU llama.cpp | 1 CPU llama.cpp + GPU ускорением |
+| ----------------------------- | ------------ | ---------------- | ----------------- | --------------- | -------------------------------- |
+| Qwen3-235B-A22B-Thinking-2507 | Q8_0         | 225              | 13.9              | 4.57            | 6.06                             |
+| DeepSeek-R1-0528 671B         | Q8_0         | 648              | 25                | 2.33            | 4.19                             |
+| Kimi-K2-1026B                 | Q4_K_M       | 571              | 15.4              | 4.63            | 6.46                             |
+| GPT OSS 120B                  | Q4_K_M       | 59               | 5                 | 21.99           | 25.8                             |
+| GLM-4.5-Air 355B              | Q4_K_M       | 69               | 10.9              | 10.46           | 16.1                             |
 
 Команда с нулевой температурой для `llama.cpp` с GPU ускорением
 ```shell
